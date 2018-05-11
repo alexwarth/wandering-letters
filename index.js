@@ -21,7 +21,10 @@ class Letter {
   computeDeltas() {
     let desiredX;
     let desiredY;
-    if (this.prev === null) {
+    if (this.dragging) {
+      desiredX = this.x;
+      desiredY = this.y;
+    } else if (this.prev === null) {
       desiredX = leftMargin;
       desiredY = topMargin;
     } else if (this.value === ' ') {
@@ -86,7 +89,16 @@ for (const c of text) {
   lastLetter = currLetter;
 }
 
+function forEachLetter(fn) {
+  let currLetter = firstLetter;
+  while (currLetter !== null) {
+    fn(currLetter);
+    currLetter = currLetter.next;
+  }
+}
+
 let t = 0;
+let speed = 5;
 
 function main() {
   canvas.width = innerWidth;
@@ -99,33 +111,60 @@ function main() {
       innerWidth - leftMargin - rightMargin,
       innerHeight);
 
-  let currLetter = firstLetter;
-  while (currLetter !== null) {
-    currLetter.computeDeltas();
-    currLetter = currLetter.next;
+  for (let idx = 0; idx < speed; idx++) {
+    forEachLetter(letter => letter.computeDeltas());
+    forEachLetter(letter => {
+      letter.applyDeltas();
+    });
   }
-
-  currLetter = firstLetter;
-  while (currLetter !== null) {
-    currLetter.applyDeltas();
-    currLetter.draw(t);
-    currLetter = currLetter.next;
-  }
+  forEachLetter(letter => letter.draw(t));
 
   t++;
   requestAnimationFrame(main);
 }
 
 let letterAfterCursor = null;
+let movingLeftMargin = false;
+let movingRightMargin = false;
 
 document.body.onmousedown = e => {
-  letterAfterCursor = null;
-  let currLetter = firstLetter;
-  while (letterAfterCursor === null && currLetter !== null) {
-    if (currLetter.containsPoint(e.offsetX, e.offsetY)) {
-      letterAfterCursor = currLetter;
+  movingLeftMargin = false;
+  movingRightMargin = false;
+  if (e.offsetX <= leftMargin) {
+    movingLeftMargin = true;
+  } else if (innerWidth - e.offsetX <= rightMargin) {
+    movingRightMargin = true;
+  } else {
+    letterAfterCursor = null;
+    let currLetter = firstLetter;
+    while (letterAfterCursor === null && currLetter !== null) {
+      if (currLetter.containsPoint(e.offsetX, e.offsetY)) {
+        letterAfterCursor = currLetter;
+      }
+      currLetter = currLetter.next;
     }
-    currLetter = currLetter.next;
+    if (letterAfterCursor !== null) {
+      letterAfterCursor.dragging = true;
+    }
+  }
+};
+
+document.body.onmousemove = e => {
+  if (movingLeftMargin) {
+    leftMargin = e.offsetX;
+  } else if (movingRightMargin) {
+    rightMargin = innerWidth - e.offsetX;
+  } else if (letterAfterCursor !== null && letterAfterCursor.dragging) {
+    letterAfterCursor.x = e.offsetX;
+    letterAfterCursor.y = e.offsetY;
+  }
+};
+
+document.body.onmouseup = e => {
+  movingLeftMargin = false;
+  movingRightMargin = false;
+  if (letterAfterCursor !== null) {
+    letterAfterCursor.dragging = false;
   }
 };
 
@@ -155,4 +194,3 @@ document.body.onkeydown = e => {
 };
 
 main();
-
